@@ -1,0 +1,328 @@
+Query 1:
+
+
+SELECT "Host".id, COUNT(*) FROM "Listing", "Host" 
+WHERE "Host".id="Listing".host_id
+GROUP BY "Host".id;
+ 
+before index :
+
+"GroupAggregate  (cost=10000003709.40..10000004195.19 rows=6363 width=12) (actual time=607.891..633.225 rows=6363 loops=1)"
+"  Group Key: "Host".id"
+"  ->  Merge Join  (cost=10000003709.40..10000004073.85 rows=11541 width=4) (actual time=607.873..628.353 rows=11541 loops=1)"
+"        Merge Cond: ("Listing".host_id = "Host".id)"
+"        ->  Sort  (cost=10000003709.11..10000003737.96 rows=11541 width=4) (actual time=607.841..610.950 rows=11541 loops=1)"
+"              Sort Key: "Listing".host_id"
+"              Sort Method: quicksort  Memory: 925kB"
+"              ->  Seq Scan on "Listing"  (cost=10000000000.00..10000002930.41 rows=11541 width=4) (actual time=0.011..602.412 rows=11541 loops=1)"
+"        ->  Index Only Scan using "Host_pkey" on "Host"  (cost=0.28..175.73 rows=6363 width=4) (actual time=0.026..10.096 rows=6363 loops=1)"
+"              Heap Fetches: 0"
+"Planning Time: 8.605 ms"
+"Execution Time: 634.537 ms"
+
+after index :
+
+"HashAggregate  (cost=652.69..716.32 rows=6363 width=12) (actual time=19.446..21.201 rows=6363 loops=1)"
+"  Group Key: "Host".id"
+"  ->  Hash Join  (cost=255.55..594.98 rows=11541 width=4) (actual time=5.291..14.928 rows=11541 loops=1)"
+"        Hash Cond: ("Listing".host_id = "Host".id)"
+"        ->  Index Only Scan using intex_1 on "Listing"  (cost=0.29..309.40 rows=11541 width=4) (actual time=0.016..4.213 rows=11541 loops=1)"
+"              Heap Fetches: 0"
+"        ->  Hash  (cost=175.73..175.73 rows=6363 width=4) (actual time=5.251..5.251 rows=6363 loops=1)"
+"              Buckets: 8192  Batches: 1  Memory Usage: 288kB"
+"              ->  Index Only Scan using "Host_pkey" on "Host"  (cost=0.28..175.73 rows=6363 width=4) (actual time=0.624..3.473 rows=6363 loops=1)"
+"                    Heap Fetches: 0"
+"Planning Time: 1.192 ms"
+"Execution Time: 22.837 ms"
+
+
+Query 2:
+
+SELECT "Price".id, price FROM "Listing", "Price" WHERE guests_included > 5 AND price > 40;*/
+
+before index :
+
+"Nested Loop  (cost=10000000000.28..10000019409.97 rows=1500330 width=12) (actual time=1.922..1654.625 rows=2469774 loops=1)"
+"  ->  Index Only Scan using "Listings-copy_pkey" on "Listing"  (cost=0.29..309.40 rows=11541 width=0) (actual time=1.421..16.644 rows=11541 loops=1)"
+"        Heap Fetches: 0"
+"  ->  Materialize  (cost=10000000000.00..10000000346.76 rows=130 width=12) (actual time=0.000..0.050 rows=214 loops=11541)"
+"        ->  Seq Scan on "Price"  (cost=10000000000.00..10000000346.11 rows=130 width=12) (actual time=0.493..41.565 rows=214 loops=1)"
+"              Filter: ((guests_included > 5) AND (price > '40'::double precision))"
+"              Rows Removed by Filter: 11327"
+"Planning Time: 12.149 ms"
+"Execution Time: 2110.981 ms"
+
+
+
+after index (no price):
+
+"Nested Loop  (cost=9.58..19258.74 rows=1500330 width=12) (actual time=0.091..1507.847 rows=2469774 loops=1)"
+"  ->  Index Only Scan using "Listings-copy_pkey" on "Listing"  (cost=0.29..309.40 rows=11541 width=0) (actual time=0.023..4.531 rows=11541 loops=1)"
+"        Heap Fetches: 0"
+"  ->  Materialize  (cost=9.29..195.54 rows=130 width=12) (actual time=0.000..0.044 rows=214 loops=11541)"
+"        ->  Bitmap Heap Scan on "Price"  (cost=9.29..194.89 rows=130 width=12) (actual time=0.062..0.344 rows=214 loops=1)"
+"              Recheck Cond: (guests_included > 5)"
+"              Filter: (price > '40'::double precision)"
+"              Rows Removed by Filter: 10"
+"              Heap Blocks: exact=126"
+"              ->  Bitmap Index Scan on intex_2  (cost=0.00..9.26 rows=223 width=0) (actual time=0.042..0.042 rows=224 loops=1)"
+"Planning Time: 1.191 ms"
+"Execution Time: 1952.028 ms"
+
+
+
+after index (with price):
+
+"Nested Loop  (cost=0.43..19073.94 rows=1500330 width=12) (actual time=0.457..1493.332 rows=2469774 loops=1)"
+"  ->  Index Only Scan using intex_1 on "Listing"  (cost=0.29..309.40 rows=11541 width=0) (actual time=0.018..4.102 rows=11541 loops=1)"
+"        Heap Fetches: 0"
+"  ->  Materialize  (cost=0.14..10.75 rows=130 width=12) (actual time=0.000..0.043 rows=214 loops=11541)"
+"        ->  Index Only Scan using intex_2 on "Price"  (cost=0.14..10.10 rows=130 width=12) (actual time=0.433..0.490 rows=214 loops=1)"
+"              Heap Fetches: 0"
+"Planning Time: 0.407 ms"
+"Execution Time: 1938.490 ms"
+
+
+Our Query 1:
+
+select R.id, R.beds,R.bed_type,R.price
+from "Room" as R
+join "Location" as L
+on L.id = R.id
+where L.neighbourhood_cleansed = 'ΠΕΤΡΑΛΩΝΑ' and R.bed_type = 'Real Bed' and R.beds = 3;*/
+
+
+before index :
+
+"Hash Join  (cost=20000000381.33..20000001206.80 rows=51 width=24) (actual time=55.907..530.944 rows=50 loops=1)"
+"  Hash Cond: (r.id = l.id)"
+"  ->  Seq Scan on "Room" r  (cost=10000000000.00..10000000818.11 rows=1826 width=24) (actual time=0.071..483.287 rows=1837 loops=1)"
+"        Filter: (((bed_type)::text = 'Real Bed'::text) AND (beds = 3))"
+"        Rows Removed by Filter: 9704"
+"  ->  Hash  (cost=10000000377.26..10000000377.26 rows=325 width=4) (actual time=46.734..46.734 rows=325 loops=1)"
+"        Buckets: 1024  Batches: 1  Memory Usage: 20kB"
+"        ->  Seq Scan on "Location" l  (cost=10000000000.00..10000000377.26 rows=325 width=4) (actual time=1.733..46.552 rows=325 loops=1)"
+"              Filter: ((neighbourhood_cleansed)::text = 'ΠΕΤΡΑΛΩΝΑ'::text)"
+"              Rows Removed by Filter: 11216"
+"Planning Time: 5.595 ms"
+"Execution Time: 531.027 ms"
+
+
+after index :
+
+
+"Hash Join  (cost=745.36..2073.05 rows=51 width=24) (actual time=5.560..11.258 rows=50 loops=1)"
+"  Hash Cond: (l.id = r.id)"
+"  ->  Index Scan using our_intex_4_3 on "Location" l  (cost=0.29..1326.24 rows=325 width=4) (actual time=0.177..6.033 rows=325 loops=1)"
+"        Filter: ((neighbourhood_cleansed)::text = 'ΠΕΤΡΑΛΩΝΑ'::text)"
+"        Rows Removed by Filter: 11216"
+"  ->  Hash  (cost=722.25..722.25 rows=1826 width=24) (actual time=5.100..5.100 rows=1837 loops=1)"
+"        Buckets: 2048  Batches: 1  Memory Usage: 117kB"
+"        ->  Bitmap Heap Scan on "Room" r  (cost=49.86..722.25 rows=1826 width=24) (actual time=1.509..4.339 rows=1837 loops=1)"
+"              Recheck Cond: (((bed_type)::text = 'Real Bed'::text) AND (beds = 3))"
+"              Heap Blocks: exact=619"
+"              ->  Bitmap Index Scan on our_intex_1  (cost=0.00..49.41 rows=1826 width=0) (actual time=1.436..1.436 rows=1837 loops=1)"
+"Planning Time: 1.985 ms"
+"Execution Time: 11.308 ms"
+
+
+
+
+
+
+*Our Query 2:
+
+select "Price".id, "Price".cleaning_fee
+from "Price"
+full outer join "Calendar"
+on "Calendar".listing_id = "Price".id 
+where "Calendar".available = true and "Calendar".date = '2020-03-18';
+
+before index :
+"Hash Right Join  (cost=10000122950.71..10000123269.43 rows=7477 width=12) (actual time=13656.564..13664.910 rows=5645 loops=1)"
+"  Hash Cond: ("Price".id = "Calendar".listing_id)"
+"  ->  Seq Scan on "Price"  (cost=10000000000.00..10000000288.41 rows=11541 width=12) (actual time=0.010..2.527 rows=11541 loops=1)"
+"  ->  Hash  (cost=122857.25..122857.25 rows=7477 width=4) (actual time=13656.524..13656.524 rows=5645 loops=1)"
+"        Buckets: 8192  Batches: 1  Memory Usage: 263kB"
+"        ->  Index Scan using "Calendar_pkey" on "Calendar"  (cost=0.43..122857.25 rows=7477 width=4) (actual time=0.675..13649.440 rows=5645 loops=1)"
+"              Index Cond: (date = '2020-03-18'::date)"
+"              Filter: available"
+"              Rows Removed by Filter: 5896"
+"Planning Time: 13.985 ms"
+"Execution Time: 13666.008 ms"
+
+
+after index :
+
+"Hash Left Join  (cost=1300.04..19013.14 rows=7477 width=12) (actual time=13.879..29.779 rows=5645 loops=1)"
+"  Hash Cond: ("Calendar".listing_id = "Price".id)"
+"  ->  Bitmap Heap Scan on "Calendar"  (cost=102.38..17712.67 rows=7477 width=4) (actual time=1.544..13.640 rows=5645 loops=1)"
+"        Recheck Cond: (available AND (date = '2020-03-18'::date))"
+"        Heap Blocks: exact=5313"
+"        ->  Bitmap Index Scan on our_intex_2  (cost=0.00..100.51 rows=7477 width=0) (actual time=0.836..0.836 rows=5645 loops=1)"
+"  ->  Hash  (cost=1053.40..1053.40 rows=11541 width=12) (actual time=12.293..12.293 rows=11541 loops=1)"
+"        Buckets: 16384  Batches: 1  Memory Usage: 648kB"
+"        ->  Index Scan using our_intex_4_1 on "Price"  (cost=0.29..1053.40 rows=11541 width=12) (actual time=0.011..8.367 rows=11541 loops=1)"
+"Planning Time: 4.002 ms"
+"Execution Time: 30.893 ms"
+
+
+
+
+
+
+
+
+
+
+
+Our Query 3:
+
+select "Location".neighbourhood, count("Host".id) as number_of_hosts
+from "Location"
+join "Host"
+on "Host".neighbourhood = "Location".neighbourhood
+group by "Location".neighbourhood
+having count("Host".id) > 100000
+order by number_of_hosts;
+
+before index :
+
+"Sort  (cost=20000067279.00..20000067279.03 rows=11 width=17) (actual time=2694.447..2694.451 rows=10 loops=1)"
+"  Sort Key: (count("Host".id))"
+"  Sort Method: quicksort  Memory: 25kB"
+"  ->  GroupAggregate  (cost=20000002067.74..20000067278.81 rows=11 width=17) (actual time=244.826..2694.402 rows=10 loops=1)"
+"        Group Key: "Location".neighbourhood"
+"        Filter: (count("Host".id) > 100000)"
+"        Rows Removed by Filter: 22"
+"        ->  Merge Join  (cost=20000002067.74..20000045549.72 rows=2897158 width=13) (actual time=39.901..1957.322 rows=2897158 loops=1)"
+"              Merge Cond: (("Host".neighbourhood)::text = ("Location".neighbourhood)::text)"
+"              ->  Sort  (cost=10000000940.63..10000000956.54 rows=6363 width=13) (actual time=27.087..28.941 rows=4924 loops=1)"
+"                    Sort Key: "Host".neighbourhood"
+"                    Sort Method: quicksort  Memory: 512kB"
+"                    ->  Seq Scan on "Host"  (cost=10000000000.00..10000000538.63 rows=6363 width=13) (actual time=0.017..22.784 rows=6363 loops=1)"
+"              ->  Sort  (cost=10000001127.11..10000001155.96 rows=11541 width=9) (actual time=12.807..621.291 rows=2897159 loops=1)"
+"                    Sort Key: "Location".neighbourhood"
+"                    Sort Method: quicksort  Memory: 927kB"
+"                    ->  Seq Scan on "Location"  (cost=10000000000.00..10000000348.41 rows=11541 width=9) (actual time=0.005..3.848 rows=11541 loops=1)"
+"Planning Time: 1.160 ms"
+"Execution Time: 2694.635 ms"
+
+
+after index :
+
+"Sort  (cost=58798.32..58798.35 rows=11 width=17) (actual time=1763.969..1763.971 rows=10 loops=1)"
+"  Sort Key: (count("Host".id))"
+"  Sort Method: quicksort  Memory: 25kB"
+"  ->  HashAggregate  (cost=58797.73..58798.13 rows=11 width=17) (actual time=1763.946..1763.953 rows=10 loops=1)"
+"        Group Key: "Location".neighbourhood"
+"        Filter: (count("Host".id) > 100000)"
+"        Rows Removed by Filter: 22"
+"        ->  Hash Join  (cost=287.55..37069.04 rows=2897158 width=13) (actual time=3.932..821.132 rows=2897158 loops=1)"
+"              Hash Cond: (("Location".neighbourhood)::text = ("Host".neighbourhood)::text)"
+"              ->  Index Only Scan using our_intex_3_2 on "Location"  (cost=0.29..337.40 rows=11541 width=9) (actual time=0.050..3.842 rows=11541 loops=1)"
+"                    Heap Fetches: 0"
+"              ->  Hash  (cost=207.73..207.73 rows=6363 width=13) (actual time=3.860..3.861 rows=4923 loops=1)"
+"                    Buckets: 8192  Batches: 1  Memory Usage: 282kB"
+"                    ->  Index Only Scan using our_intex_3_1 on "Host"  (cost=0.28..207.73 rows=6363 width=13) (actual time=0.015..1.903 rows=6363 loops=1)"
+"                          Heap Fetches: 0"
+"Planning Time: 0.254 ms"
+"Execution Time: 1764.038 ms"
+
+
+
+Our Query 4:
+
+select avg(cast("Listing".review_scores_rating as int)) as avg_rating, "Location".neighbourhood	
+from "Listing"
+join "Price"
+on "Listing".id = "Price".id
+join "Location"
+on "Location".id = "Price".id
+group by "Location".neighbourhood
+having avg("Price".price) > 60;
+
+before index :
+
+"GroupAggregate  (cost=20000005865.75..20000006039.42 rows=11 width=41) (actual time=71.794..77.422 rows=13 loops=1)"
+"  Group Key: "Location".neighbourhood"
+"  Filter: (avg("Price".price) > '60'::double precision)"
+"  Rows Removed by Filter: 20"
+"  ->  Sort  (cost=20000005865.75..20000005894.60 rows=11541 width=20) (actual time=70.651..73.052 rows=11541 loops=1)"
+"        Sort Key: "Location".neighbourhood"
+"        Sort Method: quicksort  Memory: 1242kB"
+"        ->  Hash Join  (cost=20000001560.07..20000005087.05 rows=11541 width=20) (actual time=16.374..62.791 rows=11541 loops=1)"
+"              Hash Cond: ("Listing".id = "Location".id)"
+"              ->  Merge Join  (cost=10000001067.40..10000004435.69 rows=11541 width=19) (actual time=8.214..47.404 rows=11541 loops=1)"
+"                    Merge Cond: ("Listing".id = "Price".id)"
+"                    ->  Index Scan using "Listings-copy_pkey" on "Listing"  (cost=0.29..3166.62 rows=11541 width=7) (actual time=0.016..26.701 rows=11541 loops=1)"
+"                    ->  Sort  (cost=10000001067.11..10000001095.96 rows=11541 width=12) (actual time=8.191..11.450 rows=11541 loops=1)"
+"                          Sort Key: "Price".id"
+"                          Sort Method: quicksort  Memory: 925kB"
+"                          ->  Seq Scan on "Price"  (cost=10000000000.00..10000000288.41 rows=11541 width=12) (actual time=0.004..3.296 rows=11541 loops=1)"
+"              ->  Hash  (cost=10000000348.41..10000000348.41 rows=11541 width=13) (actual time=8.133..8.134 rows=11541 loops=1)"
+"                    Buckets: 16384  Batches: 1  Memory Usage: 655kB"
+"                    ->  Seq Scan on "Location"  (cost=10000000000.00..10000000348.41 rows=11541 width=13) (actual time=0.006..4.086 rows=11541 loops=1)"
+"Planning Time: 1.391 ms"
+"Execution Time: 77.618 ms"
+
+after index :
+
+"HashAggregate  (cost=1538.69..1539.25 rows=11 width=41) (actual time=32.945..32.960 rows=13 loops=1)"
+"  Group Key: "Location".neighbourhood"
+"  Filter: (avg("Price".price) > '60'::double precision)"
+"  Rows Removed by Filter: 20"
+"  ->  Merge Join  (cost=0.86..1394.43 rows=11541 width=20) (actual time=0.046..27.619 rows=11541 loops=1)"
+"        Merge Cond: ("Listing".id = "Location".id)"
+"        ->  Merge Join  (cost=0.57..855.92 rows=11541 width=19) (actual time=0.031..15.052 rows=11541 loops=1)"
+"              Merge Cond: ("Listing".id = "Price".id)"
+"              ->  Index Only Scan using our_intex_4_2 on "Listing"  (cost=0.29..321.40 rows=11541 width=7) (actual time=0.017..3.111 rows=11541 loops=1)"
+"                    Heap Fetches: 0"
+"              ->  Index Only Scan using our_intex_4_1 on "Price"  (cost=0.29..361.40 rows=11541 width=12) (actual time=0.009..3.116 rows=11541 loops=1)"
+"                    Heap Fetches: 0"
+"        ->  Index Only Scan using our_intex_4_3 on "Location"  (cost=0.29..365.40 rows=11541 width=13) (actual time=0.013..3.091 rows=11541 loops=1)"
+"              Heap Fetches: 0"
+"Planning Time: 0.525 ms"
+"Execution Time: 33.031 ms"
+
+
+
+
+Our Query 5:
+
+select "Geolocation".properties_neighbourhood, count("Location".id) as number_of_listings, "Geolocation".properties_neighbourhood_group
+from "Location"
+full outer join "Geolocation"
+on "Geolocation".properties_neighbourhood = "Location".neighbourhood_cleansed
+where "Geolocation".properties_neighbourhood  = 'ΓΟΥΒΑ' or "Geolocation".properties_neighbourhood = 'ΓΚΑΖΙ' or "Geolocation".properties_neighbourhood = 'ΘΗΣΕΙΟ'
+group by  "Geolocation".properties_neighbourhood;
+
+
+before index :
+
+"GroupAggregate  (cost=10000000000.14..10000000920.64 rows=3 width=67) (actual time=12.181..22.019 rows=3 loops=1)"
+"  Group Key: "Geolocation".properties_neighbourhood"
+"  ->  Nested Loop Left Join  (cost=10000000000.14..10000000916.76 rows=769 width=63) (actual time=0.095..21.880 rows=479 loops=1)"
+"        Join Filter: (("Geolocation".properties_neighbourhood)::text = ("Location".neighbourhood_cleansed)::text)"
+"        Rows Removed by Join Filter: 34144"
+"        ->  Index Scan using "Geolocation_pkey" on "Geolocation"  (cost=0.14..20.15 rows=3 width=59) (actual time=0.030..0.090 rows=3 loops=1)"
+"              Filter: (((properties_neighbourhood)::text = 'ΓΟΥΒΑ'::text) OR ((properties_neighbourhood)::text = 'ΓΚΑΖΙ'::text) OR ((properties_neighbourhood)::text = 'ΘΗΣΕΙΟ'::text))"
+"              Rows Removed by Filter: 42"
+"        ->  Materialize  (cost=10000000000.00..10000000406.11 rows=11541 width=33) (actual time=0.003..4.668 rows=11541 loops=3)"
+"              ->  Seq Scan on "Location"  (cost=10000000000.00..10000000348.41 rows=11541 width=33) (actual time=0.005..3.990 rows=11541 loops=1)"
+"Planning Time: 4.667 ms"
+"Execution Time: 22.185 ms"
+
+
+after index :
+
+"GroupAggregate  (cost=10000000000.13..10000000912.66 rows=3 width=67) (actual time=11.902..21.791 rows=3 loops=1)"
+"  Group Key: "Geolocation".properties_neighbourhood"
+"  ->  Nested Loop Left Join  (cost=10000000000.13..10000000908.78 rows=769 width=63) (actual time=0.074..21.652 rows=479 loops=1)"
+"        Join Filter: (("Geolocation".properties_neighbourhood)::text = ("Location".neighbourhood_cleansed)::text)"
+"        Rows Removed by Join Filter: 34144"
+"        ->  Index Scan using our_intex_5 on "Geolocation"  (cost=0.13..12.18 rows=3 width=59) (actual time=0.007..0.012 rows=3 loops=1)"
+"        ->  Materialize  (cost=10000000000.00..10000000406.11 rows=11541 width=33) (actual time=0.003..4.585 rows=11541 loops=3)"
+"              ->  Seq Scan on "Location"  (cost=10000000000.00..10000000348.41 rows=11541 width=33) (actual time=0.006..3.939 rows=11541 loops=1)"
+"Planning Time: 0.340 ms"
+"Execution Time: 21.951 ms"
